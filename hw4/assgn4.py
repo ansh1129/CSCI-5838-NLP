@@ -2,21 +2,24 @@ import pandas as pd
 import math
 from collections import Counter
 
-df = pd.read_csv("gene-trainF18.txt",sep='\t',usecols=[1,2], header=None)
-test =  pd.read_csv("test.txt",sep='\t',usecols=[1,2], header=None)
-#df = pd.read_csv("train.txt",sep='\t',usecols=[1,2], header=None)
-#test =  pd.read_csv("test2.txt",sep='\t',usecols=[1,2], header=None)
+df = pd.read_csv("gene-trainF18.txt",sep='\t',usecols=[0,1,2], quoting=3, header=None)
+test =  pd.read_csv("test.txt",sep='\t',usecols=[0,1,2], quoting=3, header=None)
+#df = pd.read_csv("train.txt",sep='\t',usecols=[0,1,2], header=None)
+#test =  pd.read_csv("test2.txt",sep='\t',usecols=[0,1,2], header=None)
 
+train_wn = df.iloc[:,0]
+words = df.iloc[:,1]
+tags = df.iloc[:,2]
 
-words = df.iloc[:,0]
-tags = df.iloc[:,1]
-test_words = test.iloc[:,0]
-actual_tags = test.iloc[:,1]
+test_wn = test.iloc[:,0]
+test_words = test.iloc[:,1]
+actual_tags = test.iloc[:,2]
 
 words_d = dict()
 
 #count total words and their respective frequencies
 for i,j in zip(words,tags):
+    #print("\n",i)    
     #check to see if the word exists
     if i in words_d.keys():
         #check to see if the tag exists for the word
@@ -32,6 +35,9 @@ for i,j in zip(words,tags):
         words_d[i][j] = 1
 
 vocab_count = len(words_d)
+
+#print (words_d)
+
 
 #print the most frequent tag
 #for word in words_d.keys():
@@ -140,17 +146,21 @@ predicted_tags = dict()
 unknown_words = []
 prev_tag_max_vt = dict()
 start_sent = 1
+last_wn = 1
 
 temp_vt_d = dict()
 for tag in nxt_state_d.keys():
     temp_vt_d[tag] = 1
     
 #viterbi algorithm
-for i in test_words:
+for i,l in zip(test_words,test_wn):
     col1_d = dict()
     predicted_tags[count] = dict()
 #    print("checking for word:",i)
     #find the word with observations
+    if (l<last_wn):
+        #print("starting a new sentence")
+        start_sent  = 1
     if i in observations_d.keys():
         if (start_sent == 1 ):
             for obs_key in observations_d[i].keys():
@@ -167,7 +177,7 @@ for i in test_words:
             predicted_tags[count][i] = max(col1_d, key=col1_d.get)
             prev_tag_max_vt = col1_d                
         elif ( i == '.'):
-            start_sent = 1
+       #     start_sent = 1
             predicted_tags[count][i] = 'O'
         else:
             for obs_key in observations_d[i].keys():
@@ -210,67 +220,27 @@ for i in test_words:
                 #print( "Tag is:", predicted_tags[count][i], "vt value:", prev_tag_max_vt)
 
     count = count + 1
+    last_wn = l
 
 #for i in predicted_tags:
 #    print ("\n",predicted_tags[i])        
 #print(actual_tags)
 
-count = 0
-unknown_mispred = 0
-total_mispred = 0
-correct_pred = []
-incorrect_pred = []
 
-correct_pred_gene = []
-correct_word_gene = []
-incorrect_pred_gene = []
-incorrect_word_gene = []
-
-#for i,j in zip(predicted_tags[count],actual_tags):
-for j,k in zip(actual_tags, test_words):
-    for i in predicted_tags[count]:
-        if (predicted_tags[count][i] != j):
-            print(i,":",predicted_tags[count][i],"vs",j)
-            total_mispred +=1
-            if (j == 'B' or j == 'I'):
-                incorrect_pred_gene.append(j)
-                incorrect_word_gene.append(k)
-            
-            if i not in incorrect_pred and i not in unknown_words:
-                incorrect_pred.append(i)
-            if i in unknown_words:
-                unknown_mispred += 1
-        else:
-            #if i not in correct_pred and i not in unknown_words:
-            correct_pred.append(i)
-            if (j == 'B' or j =='I'):
-                correct_pred_gene.append(j)
-                #print ("adding ",j,"and:",k)
-                correct_word_gene.append(k)
-                
-    count = count + 1
-
-common_words = list(set(correct_pred).intersection(incorrect_pred))
-
-    
-print ("total mispred:", total_mispred)
-print ("total unknown words:", len(unknown_words),"total unknown mispred:", unknown_mispred)
-print ("\nunk words:",unknown_words)
-#print ("\n incorrect words:",incorrect_pred, "total:", len(incorrect_pred))
-#print ("\n common words:",common_words, "total:", len(common_words))
-print("\n incorrect pred gene:", incorrect_pred_gene, "incorrect word gene", incorrect_word_gene, "total:", len(incorrect_word_gene))
-print("\n correct pred gene:", correct_pred_gene, "correct word gene", correct_word_gene, "total:", len(correct_word_gene))
-
+#print(predicted_tags)
 
 f = open('predictions.txt','w+')
 count = 1
-for i in predicted_tags.keys():
+last_wn = 1
+for i,l in zip(predicted_tags.keys(),test_wn):
     for word in predicted_tags[i].keys():
+        if (l < last_wn):
+            count = 1
+            f.write("\n")        
         f.write(str(count)+"\t"+str(word)+"\t"+str(predicted_tags[i][word]))
-        if (word =='.'):
-            count = 0
-            f.write("\n")
     f.write("\n")
     count = count+1
+    last_wn = l
  
 f.close() 
+
